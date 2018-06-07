@@ -1,0 +1,114 @@
+module core-link {
+    namespace "http://nl/surfnet/corelink";
+    prefix core-link;
+   
+    import tailf-common {
+        prefix tailf;
+    }
+    import ietf-inet-types {
+        prefix inet;
+    }
+    import tailf-ncs {
+        prefix ncs;
+    }
+
+    revision 2018-05-31;
+
+    grouping endpoint {
+        description "define common parameters for a connection endpoints.";
+        leaf device {
+            tailf:info "select network device";
+            type leafref {
+                path "/ncs:devices/ncs:device/ncs:name";
+            }
+            mandatory true;
+        }
+
+        leaf interface {
+            description "select unconfigured interface on device not available in the nso database. Only ge|xe|te can be selected";
+            tailf:info "select interface on device";
+            type string {
+                pattern '(ge|xe|te)-(\d{1,2})/(\d{1,2})/(\d{1,2})' {
+                    error-message 
+                        "please select correct interface. 
+                         Something like xe-4/0/3 no units!";
+                }
+            }
+            mandatory true;
+        }
+
+        leaf ipv4 {
+            tailf:info "select ipv4 address";
+            type inet:ipv4-address {
+                pattern '145\.[0-9]+\.[0-9]+\.[0-9]+' {
+                    error-message "please select correct ipv4 address";
+                }
+            }
+            mandatory true;
+        }
+
+        leaf ipv6 {
+            tailf:info "select ipv6 address";
+            type inet:ipv6-address {
+                pattern '((:|[0-9a-fA-F]{0,4}):)([0-9a-fA-F]{0,4}:){0,5}' + "'" + ' + ' + "'" + '((([0-9a-fA-F]{0,4}:)?(:|[0-9a-fA-F]{0,4}))|' + "'" + ' + ' + "'" + '(((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}' + "'" + ' + ' + "'" + '(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])))' + "'" + ' + ' + "'" + '(%[\p{N}\p{L}]+)?' + "'" {
+                    error-message "please select correct ipv6 address";
+                }
+            }
+        }
+    }
+
+    augment /ncs:services {
+        
+        list core-link {
+            description "A unique core link service between two devices";
+            tailf:info "core-link service between to routers";
+
+            key name;
+            unique "source/device source/interface";
+            unique "destination/device destination/interface";
+            unique "source/ipv4";
+            unique "destination/ipv4";
+            unique "source/ipv6";
+            unique "destination/ipv6";
+
+            uses ncs:service-data;
+            ncs:servicepoint "core-link";
+
+            leaf name {
+                description "unique name of the core link service. A link between two routers";
+                tailf:info "name of core-link service";
+           
+                type string {
+                    length "3..10" {
+                        error-message "name of core-link service should be between 3 and 10 characters long.";
+                    }
+                }
+            }
+
+            leaf isis-metric {
+                description "same isis metric used on both ends of the link. Max of 16777215(if using wide-metrics)";
+                tailf:info "ISIS metric for both interfaces on this core-link service (0..16777215)";
+                tailf:sort-priority 10;
+            
+                type uint32 {
+                    range "0..16777215" {
+                        error-message "please select an ISIS metric between 0 and 16777215";
+                    }
+                }
+                default "10";
+            }
+
+            container source {
+                tailf:info "point A of the link";
+                tailf:sort-priority 20;
+                uses core-link:endpoint;
+            }
+
+            container destination {
+                tailf:info "point B of the link";
+                tailf:sort-priority 30;
+                uses core-link:endpoint;
+            }
+        }
+    }
+}

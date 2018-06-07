@@ -1,0 +1,158 @@
+module l2vpn {
+
+  namespace "http://example.com/l2vpn";
+  prefix l2vpn;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import tailf-common {
+    prefix tailf;
+  }
+  import tailf-ncs {
+    prefix ncs;
+  }
+  import junos {
+        prefix junos;
+  }
+
+  description
+    "Surfnet L2VPN service for msp and ssp ports";
+
+  revision 2016-01-01 {
+    description
+      "Initial revision.";
+  }
+
+  grouping endpoint {
+    description "define common parameters for a UNI endpoint.";
+
+    leaf device {
+      tailf:info "select network device";
+      type leafref {
+          path "/ncs:devices/ncs:device/ncs:name";
+      }
+      mandatory true;
+    }
+
+    leaf interface {
+      description "select interface on device. We might filter this based on porttype. So first select porttype and then show available ports";
+      tailf:info "UNI interface on device";
+
+      type leafref {
+        path "deref(../device)/../ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
+      }
+      mandatory true;
+      must "re-match(current(),'(ge|xe|te)-.*')" {
+        error-message "Please select correct interfaces ^(ge|xe|te)";
+      }
+    }
+
+    leaf ptptype {
+      tailf:info "Provide the ptptype of the port";
+      type enumeration {
+        enum msp;
+        enum ssp;
+      }
+      default ssp;
+    }
+
+    container msp-info {
+      description "define specific MSP port values. Only defined if ptptype=msp and selected port has right encapsulation";
+      tailf:info "provide specific MSP port information";
+      when "../ptptype='msp'";
+      //must statement. selected interface must have right encapsultation.
+
+      leaf outervlanid {
+        description "outer vlan id, should always be configured";
+        tailf:info "UNI outer vlan id on msp port";
+        type uint32 {
+          range "2..4904";
+        }
+        mandatory true;
+      }
+
+      leaf innervlanid {
+        description "inner vlan id, only allowed when outervlanid has been configured";
+        tailf:info "UNI inner vlan id on msp port";
+        when "count(../outervlanid) > 0";
+        type uint32 {
+          range "2..4904";
+        }
+      }
+    }
+  }
+
+  augment /ncs:services {
+  
+    list l2vpn {
+      tailf:info "l2vpn p-2-p service";
+
+      key name;
+
+      uses ncs:service-data;
+      ncs:servicepoint l2vpn-servicepoint;
+
+      leaf name {
+        tailf:info "l2vpn service name";
+        type string {
+          length "5..10" {
+            error-message "name of service should be between 5 and 10 charecters long.";
+          }
+        }
+      }
+
+      leaf pw-id {
+        description "our id-alloctor script will write our generated pw-id to this leaf as operational data";
+        tailf:info "unique l2vpn pw id";
+        type uint32 {
+          range "1..50000";
+        }
+        config false;
+        tailf:cdb-oper {
+          tailf:persistent true;
+        }
+      }
+
+      list device-interface {
+        tailf:info "select 2 devices and their UNI interface";
+        uses l2vpn:endpoint;
+        key device;
+
+        min-elements 2;
+        max-elements 2;
+      }
+
+      leaf remoteportshutdown {
+        description "only enable remote port shutdown when both ends of the link are set to ssp, so ssp=2";
+        tailf:info "enable remote port shutdown for ssp?";
+        type boolean;
+        default "true";
+
+        //$ ncs_cmd -c "xe count(services/l2vpn:l2vpn[name='testtest']/device-interface[ptptype='ssp'])"
+        when "count(../device-interface[ptptype='ssp']) = 2";
+      }
+
+      leaf speed {
+        tailf:info "Provide p2p link speed in Mbps";
+        type uint32 {
+          range "1000..100000";
+        }
+        units Mbps;
+      }
+
+      leaf enforcepolicer {
+        tailf:info "Provide upper limit (> speed) in Mbps to enforce a policer on the access port";
+        type uint32 {
+          range "1001..100000";
+        }
+        units Mbps;
+
+        when "boolean(../speed)";
+        must "../speed < current()" {
+          error-message "enforcepolicer > speed";
+        }  
+      }
+    }
+  }
+}
