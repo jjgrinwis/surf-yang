@@ -43,7 +43,7 @@ module l2vpn {
         path "deref(../device)/../ncs:config/junos:configuration/junos:interfaces/junos:interface/junos:name";
       }
       mandatory true;
-      must "re-match(current(),'(ge|xe|te)-.*')" {
+      must "re-match(current(),'((ge|xe|et)-.*)|(ae\\d+)')" {
         error-message "Please select correct interfaces ^(ge|xe|te)";
       }
     }
