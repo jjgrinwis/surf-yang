@@ -33,14 +33,6 @@ class ServiceCallbacks(Service):
 
         self.log.info('we received a pw-id: ', pw_id)
 
-        # we're writing our collected pw_id as operational data in our service model
-        # we're using tctx.username and system as AAA context 
-        path = "{0}/pw-id".format(service._path)
-        with ncs.maapi.single_write_trans(tctx.username, 'system', db=ncs.OPERATIONAL) as t:
-            t.set_elem(pw_id, path)
-            t.apply()
-            self.log.info('pw-id added as operational data to model')
-        
         vars = ncs.template.Variables()
         vars.add('DUMMY', '127.0.0.1')
         template = ncs.template.Template(service)

@@ -15,6 +15,12 @@ module l2vpn {
   import junos {
         prefix junos;
   }
+  import resource-allocator {
+        prefix ralloc;
+  }
+  import id-allocator {
+    prefix idalloc;
+  }
 
   description
     "Surfnet L2VPN service for msp and ssp ports";
@@ -44,7 +50,7 @@ module l2vpn {
       }
       mandatory true;
       must "re-match(current(),'((ge|xe|et)-.*)|(ae\\d+)')" {
-        error-message "Please select correct interfaces ^(ge|xe|et) | ae ";
+        error-message "Please select correct interfaces ^(ge|xe|et) | ae";
       }
     }
 
@@ -103,15 +109,9 @@ module l2vpn {
       }
 
       leaf pw-id {
-        description "our id-alloctor script will write our generated pw-id to this leaf as operational data";
-        tailf:info "unique l2vpn pw id";
-        type uint32 {
-          range "1..50000";
-        }
-        config false;
-        tailf:cdb-oper {
-          tailf:persistent true;
-        }
+        description "id_allocator script will use resource-manager to reserve id in pw-id id-pool. We link to result using tailf:link extension";
+        tailf:link "/ralloc:resource-pools/idalloc:id-pool[idalloc:name='pw-id']/idalloc:allocation[idalloc:id=current()/../name]/idalloc:response/idalloc:id";
+        type uint32;
       }
 
       list device-interface {
